@@ -1,0 +1,22 @@
+name: qwen_cpt
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pyyaml
+  - pillow
+  - tqdm
+  - python-docx
+  - pip:
+      - rich
+      - pytesseract
+      - pdf2image
+      - datasets
+      - transformers
+      - accelerate
+      - trl
+      - peft
+      - bitsandbytes
+      - unsloth
+

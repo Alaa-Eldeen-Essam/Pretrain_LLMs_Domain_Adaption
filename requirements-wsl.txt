@@ -1,0 +1,15 @@
+pyyaml
+rich
+tqdm
+pillow
+pytesseract
+pdf2image
+python-docx
+datasets
+transformers
+accelerate
+trl
+peft
+bitsandbytes
+unsloth
+

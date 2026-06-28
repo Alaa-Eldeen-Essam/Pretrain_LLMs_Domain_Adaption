@@ -1,0 +1,6 @@
+*.jsonl
+*.pyc
+data/**
+!data/**/
+models/**
+!models/**/
