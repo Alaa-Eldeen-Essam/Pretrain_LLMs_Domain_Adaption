@@ -102,7 +102,7 @@ file.
 If WSL kills the process on large PDFs, retry with lower DPI:
 
 ```bash
-python scripts/02_extract_text_ocr.py --dpi 200
+python scripts/02_extract_text_ocr.py --dpi 400
 ```
 
 Restart OCR from zero:
