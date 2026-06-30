@@ -103,10 +103,17 @@ def main() -> int:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--strict", action="store_true", help="Return non-zero if WSL or required OCR tools are missing.")
+    parser.add_argument("--restart", action="store_true", help="Re-run the check even if the report already exists.")
     args = parser.parse_args()
 
     ensure_project_tree()
     apply_cache_environment()
+    report_path = configured_file("environment_report")
+    if report_path.exists() and not args.restart:
+        print(f"Environment report already exists, skipping. Use --restart to rebuild: {report_path}")
+        return 0
+    if args.restart:
+        report_path.unlink(missing_ok=True)
 
     checks = {
         "timestamp_utc": now_utc(),
@@ -135,7 +142,6 @@ def main() -> int:
     )
     checks["ready_for_ocr"] = bool(required_ok)
 
-    report_path = configured_file("environment_report")
     write_json(report_path, checks)
     print(f"Wrote environment report: {report_path}")
     if args.strict and not required_ok:

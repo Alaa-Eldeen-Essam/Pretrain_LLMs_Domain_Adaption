@@ -8,7 +8,9 @@ not download by design when --offline is used.
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -17,6 +19,49 @@ sys.path.insert(0, str(ROOT))
 
 from llm_pipeline.io_utils import now_utc, require_file, write_json
 from llm_pipeline.paths import apply_cache_environment, configured_file, load_training, project_path
+
+
+def latest_checkpoint(output_dir: Path) -> Path | None:
+    """Return the latest Hugging Face Trainer checkpoint in an output folder.
+
+    Needed so training can resume automatically after interruption. Used by the
+    training phase before calling `trainer.train`.
+
+    Inputs: training output directory.
+    Outputs: latest checkpoint path or None when no checkpoint exists.
+    """
+    if not output_dir.exists():
+        return None
+    checkpoints = []
+    for path in output_dir.glob("checkpoint-*"):
+        if not path.is_dir():
+            continue
+        try:
+            step = int(path.name.rsplit("-", 1)[1])
+        except (IndexError, ValueError):
+            continue
+        checkpoints.append((step, path))
+    if not checkpoints:
+        return None
+    return max(checkpoints, key=lambda item: item[0])[1]
+
+
+def report_is_complete(report_path: Path) -> bool:
+    """Return whether the training report marks a completed run.
+
+    Needed to skip fully completed training by default while still allowing
+    explicit retraining with `--restart`. Used at training startup.
+
+    Inputs: training report path.
+    Outputs: boolean completion flag.
+    """
+    if not report_path.exists():
+        return False
+    try:
+        with report_path.open("r", encoding="utf-8") as handle:
+            return json.load(handle).get("status") == "trained"
+    except Exception:  # noqa: BLE001 - malformed report should not block resume.
+        return False
 
 
 def main() -> int:
@@ -32,6 +77,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--offline", action="store_true", help="Force Hugging Face/Transformers offline mode.")
     parser.add_argument("--max-steps", type=int, default=None, help="Optional short-run override for validation.")
+    parser.add_argument("--restart", action="store_true", help="Delete existing training output and start from the base model.")
     args = parser.parse_args()
 
     apply_cache_environment()
@@ -50,6 +96,16 @@ def main() -> int:
     report_path = configured_file("train_report")
     if not base_dir.exists():
         raise FileNotFoundError(f"Base model is missing. Run 05_download_model.py later: {base_dir}")
+    if args.restart:
+        if adapter_dir.exists():
+            shutil.rmtree(adapter_dir)
+        report_path.unlink(missing_ok=True)
+    elif report_is_complete(report_path) and (adapter_dir / "adapter_config.json").exists():
+        print(f"Training already completed, skipping. Use --restart to train again: {adapter_dir}")
+        return 0
+    resume_checkpoint = latest_checkpoint(adapter_dir)
+    if resume_checkpoint is not None:
+        print(f"Resuming training from checkpoint: {resume_checkpoint}")
 
     from datasets import load_dataset
     from transformers import TrainingArguments
@@ -104,7 +160,10 @@ def main() -> int:
         args=training_args,
         packing=True,
     )
-    metrics = trainer.train()
+    if resume_checkpoint is not None:
+        metrics = trainer.train(resume_from_checkpoint=str(resume_checkpoint))
+    else:
+        metrics = trainer.train()
     adapter_dir.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(str(adapter_dir))
     tokenizer.save_pretrained(str(adapter_dir))

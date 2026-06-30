@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -28,6 +29,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--offline", action="store_true", help="Force Hugging Face/Transformers offline mode.")
     parser.add_argument("--skip-gguf", action="store_true", help="Only create the merged HF model.")
+    parser.add_argument("--restart", action="store_true", help="Delete existing export outputs and export again.")
     args = parser.parse_args()
 
     apply_cache_environment()
@@ -42,6 +44,17 @@ def main() -> int:
     report_path = configured_file("export_report")
     if not adapter_dir.exists():
         raise FileNotFoundError(f"Adapter directory is missing: {adapter_dir}")
+    gguf_exists = gguf_dir.exists() and any(gguf_dir.glob("*.gguf"))
+    merged_exists = merged_dir.exists() and any(merged_dir.iterdir())
+    if merged_exists and (args.skip_gguf or gguf_exists) and report_path.exists() and not args.restart:
+        print(f"Export already exists, skipping. Use --restart to export again: {merged_dir}")
+        return 0
+    if args.restart:
+        if merged_dir.exists():
+            shutil.rmtree(merged_dir)
+        if not args.skip_gguf and gguf_dir.exists():
+            shutil.rmtree(gguf_dir)
+        report_path.unlink(missing_ok=True)
 
     from unsloth import FastLanguageModel
 

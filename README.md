@@ -16,6 +16,8 @@ All outputs, models, caches, logs, and temporary files stay under this project:
 - Each numbered script is standalone and can be run independently after its
   previous phase output exists.
 - Scripts validate only their direct inputs and write only their own outputs.
+- Rerunning a script resumes or skips from the latest safe output by default.
+- Use `--restart` only when you intentionally want to rebuild that phase output.
 - PDFs are OCRed through rendered images and Tesseract. No PyMuPDF embedded text
   extraction is used.
 - Conda environment creation and system package installation require internet
@@ -55,6 +57,7 @@ All outputs, models, caches, logs, and temporary files stay under this project:
 
 7. `scripts/06_train_unsloth_cpt.py`
    Runs Unsloth LoRA continued pretraining from local model and dataset files.
+   If interrupted, it resumes from the latest `checkpoint-*` folder by default.
 
 8. `scripts/07_export_model.py`
    Exports the adapter to a merged model and optionally GGUF.
@@ -102,7 +105,7 @@ file.
 If WSL kills the process on large PDFs, retry with lower DPI:
 
 ```bash
-python scripts/02_extract_text_ocr.py --dpi 400
+python scripts/02_extract_text_ocr.py --dpi 200
 ```
 
 Restart OCR from zero:
@@ -122,9 +125,13 @@ Training and export should be run only after the dataset and local model exist:
 ```bash
 python scripts/06_train_unsloth_cpt.py --offline
 python scripts/07_export_model.py --offline
-python scripts/08_create_ollama_modelfile.py --force
+python scripts/08_create_ollama_modelfile.py
 python scripts/09_smoke_test_model.py
 ```
+
+To rebuild any phase intentionally, add `--restart` to that phase command. For
+the model download phase, use `--restart --allow-download` because rebuilding
+requires internet.
 
 ## Configuration
 

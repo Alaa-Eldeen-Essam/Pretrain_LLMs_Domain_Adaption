@@ -8,6 +8,7 @@ This is the only phase intended to use the internet. It does nothing unless
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 from pathlib import Path
 
@@ -32,6 +33,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--allow-download", action="store_true", help="Required before contacting Hugging Face.")
     parser.add_argument("--revision", default=None, help="Optional Hugging Face revision pin.")
+    parser.add_argument("--restart", action="store_true", help="Delete and re-download the local model when used with --allow-download.")
     args = parser.parse_args()
 
     apply_cache_environment()
@@ -39,6 +41,13 @@ def main() -> int:
     model_id = cfg["hf_model_id"]
     local_dir = project_path(cfg["local_base_dir"])
     report_path = configured_file("download_report")
+    if local_dir.exists() and any(local_dir.iterdir()) and not args.restart:
+        print(f"Base model already exists, skipping. Use --restart --allow-download to re-download: {local_dir}")
+        return 0
+    if args.restart:
+        report_path.unlink(missing_ok=True)
+        if args.allow_download and local_dir.exists():
+            shutil.rmtree(local_dir)
 
     if not args.allow_download:
         write_json(

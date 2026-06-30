@@ -31,12 +31,21 @@ def main() -> int:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=None, help="Optional file limit for quick dry runs.")
+    parser.add_argument("--restart", action="store_true", help="Rebuild inventory outputs even if they already exist.")
     args = parser.parse_args()
 
     ensure_project_tree()
     src = source_root()
     if not src.exists():
         raise FileNotFoundError(f"Source corpus folder does not exist: {src}")
+    manifest_path = configured_file("manifest")
+    summary_path = configured_file("inventory_summary")
+    if manifest_path.exists() and summary_path.exists() and not args.restart:
+        print(f"Inventory already exists, skipping. Use --restart to rebuild: {manifest_path}")
+        return 0
+    if args.restart:
+        manifest_path.unlink(missing_ok=True)
+        summary_path.unlink(missing_ok=True)
 
     records = []
     for index, path in enumerate(iter_source_files(src), start=1):
@@ -44,8 +53,6 @@ def main() -> int:
             break
         records.append(build_manifest_record(path, src))
 
-    manifest_path = configured_file("manifest")
-    summary_path = configured_file("inventory_summary")
     count = write_jsonl(manifest_path, records)
     summary = summarize_manifest(records)
     summary.update({"timestamp_utc": now_utc(), "source_root": str(src), "manifest_path": str(manifest_path)})

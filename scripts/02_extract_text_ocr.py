@@ -413,6 +413,7 @@ def main() -> int:
     if args.restart:
         output_path.unlink(missing_ok=True)
         progress_path.unlink(missing_ok=True)
+        report_path.unlink(missing_ok=True)
 
     completed_pages = completed_pages_by_doc(output_path)
     page_counts: Dict[str, int] = {}

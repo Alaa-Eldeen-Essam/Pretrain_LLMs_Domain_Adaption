@@ -42,7 +42,8 @@ def main() -> int:
     Outputs: exit code, Modelfile, and Modelfile report.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--force", action="store_true", help="Overwrite an existing Modelfile.")
+    parser.add_argument("--force", action="store_true", help="Alias for --restart; overwrite an existing Modelfile.")
+    parser.add_argument("--restart", action="store_true", help="Overwrite an existing Modelfile and report.")
     args = parser.parse_args()
 
     cfg = load_training()
@@ -51,8 +52,14 @@ def main() -> int:
     gguf_dir = project_path(model_cfg["gguf_dir"])
     gguf_path = find_gguf(gguf_dir, model_cfg["gguf_filename"])
     modelfile = gguf_dir / "Modelfile"
-    if modelfile.exists() and not args.force:
-        raise FileExistsError(f"Modelfile exists. Re-run with --force to overwrite: {modelfile}")
+    report_path = configured_file("modelfile_report")
+    restart = args.restart or args.force
+    if modelfile.exists() and report_path.exists() and not restart:
+        print(f"Modelfile already exists, skipping. Use --restart to rebuild: {modelfile}")
+        return 0
+    if restart:
+        modelfile.unlink(missing_ok=True)
+        report_path.unlink(missing_ok=True)
 
     content = f"""FROM {gguf_path.name}
 PARAMETER num_ctx {ollama_cfg["num_ctx"]}
@@ -61,7 +68,7 @@ SYSTEM \"\"\"{ollama_cfg["system_prompt"]}\"\"\"
 """
     modelfile.write_text(content, encoding="utf-8")
     write_json(
-        configured_file("modelfile_report"),
+        report_path,
         {
             "timestamp_utc": now_utc(),
             "status": "modelfile_created",

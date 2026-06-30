@@ -28,12 +28,19 @@ def main() -> int:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit-pages", type=int, default=None, help="Optional page limit for quick checks.")
+    parser.add_argument("--restart", action="store_true", help="Rebuild cleaned text outputs even if they already exist.")
     args = parser.parse_args()
 
     cfg = load_training()["cleaning"]
     input_path = require_file(configured_file("ocr_pages"), "OCR pages")
     output_path = configured_file("clean_pages")
     report_path = configured_file("cleaning_report")
+    if output_path.exists() and report_path.exists() and not args.restart:
+        print(f"Cleaned text already exists, skipping. Use --restart to rebuild: {output_path}")
+        return 0
+    if args.restart:
+        output_path.unlink(missing_ok=True)
+        report_path.unlink(missing_ok=True)
 
     pages = list(read_jsonl(input_path))
     if args.limit_pages is not None:

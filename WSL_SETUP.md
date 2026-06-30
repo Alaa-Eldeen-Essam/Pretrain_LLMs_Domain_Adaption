@@ -2,6 +2,9 @@
 
 Run these commands inside WSL, not PowerShell.
 
+All phase scripts resume or skip from their latest safe output by default. Add
+`--restart` only when you intentionally want to rebuild that phase output.
+
 ## 1. Enter The Project
 
 ```bash
@@ -112,6 +115,9 @@ To intentionally discard previous OCR output and start over:
 python scripts/02_extract_text_ocr.py --restart
 ```
 
+The same `--restart` pattern applies to inventory, cleaning, dataset, export,
+Modelfile, and smoke-test phases.
+
 ## 7. Download Model Later
 
 The download phase is intentionally guarded:
@@ -128,6 +134,12 @@ When you explicitly want the download:
 python scripts/05_download_model.py --allow-download
 ```
 
+To intentionally delete and re-download the local model:
+
+```bash
+python scripts/05_download_model.py --allow-download --restart
+```
+
 ## 8. Train Later From Local Files
 
 ```bash
@@ -135,3 +147,12 @@ python scripts/06_train_unsloth_cpt.py --offline
 ```
 
 This expects the base model to already exist under `models/base`.
+
+If training is interrupted, rerun the same command. It resumes from the latest
+`checkpoint-*` folder automatically.
+
+To intentionally discard checkpoints and start from the base model:
+
+```bash
+python scripts/06_train_unsloth_cpt.py --offline --restart
+```

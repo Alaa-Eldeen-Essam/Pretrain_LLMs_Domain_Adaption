@@ -26,6 +26,7 @@ def main() -> int:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-ollama", action="store_true", help="Actually run a local Ollama prompt.")
+    parser.add_argument("--restart", action="store_true", help="Re-run smoke checks even if the report already exists.")
     parser.add_argument("--prompt", default="اشرح بإيجاز معنى نظام التشويش.", help="Prompt for optional Ollama test.")
     args = parser.parse_args()
 
@@ -35,6 +36,12 @@ def main() -> int:
     gguf_dir = project_path(model_cfg["gguf_dir"])
     modelfile = gguf_dir / "Modelfile"
     ggufs = sorted(gguf_dir.glob("*.gguf")) if gguf_dir.exists() else []
+    report_path = configured_file("smoke_report")
+    if report_path.exists() and not args.restart:
+        print(f"Smoke report already exists, skipping. Use --restart to run again: {report_path}")
+        return 0
+    if args.restart:
+        report_path.unlink(missing_ok=True)
 
     report = {
         "timestamp_utc": now_utc(),
@@ -59,8 +66,8 @@ def main() -> int:
             "stderr": completed.stderr[-4000:],
         }
 
-    write_json(configured_file("smoke_report"), report)
-    print(f"Wrote smoke report: {configured_file('smoke_report')}")
+    write_json(report_path, report)
+    print(f"Wrote smoke report: {report_path}")
     if not ggufs or not modelfile.exists():
         print("Smoke check incomplete: GGUF and Modelfile must exist before runtime testing.")
         return 1
